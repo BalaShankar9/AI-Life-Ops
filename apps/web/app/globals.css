@@ -1,0 +1,38 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  font-family: "Space Grotesk", "Avenir Next", "Helvetica Neue", sans-serif;
+}
+
+:root {
+  --ink: #0f172a;
+  --muted: #5b6672;
+  --panel: rgba(255, 255, 255, 0.82);
+  --border: rgba(148, 163, 184, 0.45);
+  --accent: #0f4c5c;
+}
+
+body {
+  color: var(--ink);
+  background:
+    radial-gradient(circle at 15% 20%, rgba(148, 163, 184, 0.25), transparent 55%),
+    radial-gradient(circle at 85% 10%, rgba(56, 189, 248, 0.15), transparent 45%),
+    linear-gradient(160deg, #f8f7f4 0%, #eef2f4 60%, #e8edf0 100%);
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-rise {
+  animation: rise 0.5s ease-out both;
+}

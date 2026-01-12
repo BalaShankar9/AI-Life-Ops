@@ -1,0 +1,130 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+env:
+  NODE_VERSION: '20'
+  PYTHON_VERSION: '3.9'
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ci_user
+          POSTGRES_PASSWORD: ci_password
+          POSTGRES_DB: ai_life_ops_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Install Python dependencies
+        run: |
+          cd packages/engine
+          pip install -e .
+          pip install pytest
+
+      - name: Copy CI environment file
+        run: |
+          cp .env.ci apps/api/.env
+          cp apps/web/.env.example apps/web/.env.local
+
+      - name: Generate Prisma client
+        run: npm run prisma:generate -w apps/api
+
+      - name: Run database migrations
+        run: npm run prisma:migrate -w apps/api
+        env:
+          DATABASE_URL: postgresql://ci_user:ci_password@localhost:5432/ai_life_ops_test
+
+      - name: Run secrets scan
+        run: npm run verify:secrets
+
+      - name: Run typecheck
+        run: npm run verify:typecheck
+
+      - name: Run tests
+        run: npm run verify:test
+        env:
+          DATABASE_URL: postgresql://ci_user:ci_password@localhost:5432/ai_life_ops_test
+          REDIS_URL: redis://localhost:6379
+
+      - name: Build all packages
+        run: npm run verify:build
+        env:
+          DATABASE_URL: postgresql://ci_user:ci_password@localhost:5432/ai_life_ops_test
+
+      - name: Upload test results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: |
+            apps/api/coverage/
+            packages/engine/.pytest_cache/
+            playwright-report/
+          retention-days: 7
+
+  security-scan:
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Run npm audit
+        run: npm audit --audit-level=moderate
+        continue-on-error: true
+
+      - name: Check for secrets
+        run: |
+          npm ci
+          npm run verify:secrets

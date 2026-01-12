@@ -1,0 +1,4 @@
+[console_scripts]
+engine-cli = engine_cli:main
+weekly-cli = weekly_cli:main
+

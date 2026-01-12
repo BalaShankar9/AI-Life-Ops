@@ -1,0 +1,39 @@
+{
+  "name": "ai-life-ops",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "postinstall": "npm run build -w packages/shared",
+    "dev:web": "npm run dev -w apps/web",
+    "dev:api": "npm run dev -w apps/api",
+    "dev:worker": "npm run worker -w apps/api",
+    "dev": "concurrently -k \"npm run dev:web\" \"npm run dev:api\"",
+    "preview": "concurrently -k \"npm run dev:api\" \"npm run dev:worker\" \"npm run dev:web\"",
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "db:reset": "npm run db:down && npm run db:up && sleep 3 && npm run prisma:migrate -w apps/api && npm run prisma:seed -w apps/api",
+    "typecheck": "npm run typecheck -w apps/api && npm run typecheck -w apps/web && npm run typecheck -w packages/shared",
+    "lint": "echo \"Lint not configured yet\"",
+    "test:engine": "pytest packages/engine/tests",
+    "test:api": "npm run test -w apps/api",
+    "test:web": "node apps/web/scripts/smoke.mjs",
+    "test": "npm run test:engine && npm run test:api && npm run test:web",
+    "build:api": "npm run build -w apps/api",
+    "build:web": "npm run build -w apps/web",
+    "build:shared": "npm run build -w packages/shared",
+    "build": "npm run build:shared && npm run build:api && npm run build:web",
+    "verify:secrets": "node scripts/secrets-scan.mjs",
+    "verify:typecheck": "npm run typecheck",
+    "verify:test": "npm run test",
+    "verify:build": "npm run build",
+    "verify:quick": "npm run verify:typecheck && npm run verify:test && npm run verify:secrets",
+    "verify": "npm run verify:quick && npm run verify:build"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
+

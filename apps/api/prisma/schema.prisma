@@ -1,0 +1,545 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum OrgType {
+  personal
+  team
+}
+
+enum MembershipRole {
+  owner
+  admin
+  member
+  coach
+  viewer
+}
+
+enum MembershipStatus {
+  active
+  invited
+  revoked
+}
+
+model Organization {
+  id        String   @id @default(uuid())
+  name      String
+  type      OrgType  @default(personal)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  memberships Membership[]
+  invites OrgInvite[]
+  checkins Checkin[]
+  snapshots Snapshot[]
+  weeklyReports WeeklyReport[]
+  scenarioPacks ScenarioPack[]
+  scenarios Scenario[]
+  scenarioRuns ScenarioRun[]
+  connectors Connector[]
+  connectorRuns ConnectorRun[]
+  events Event[]
+  personalizationProfiles PersonalizationProfile[]
+  actionFeedback ActionFeedback[]
+  sharingConsents SharingConsent[]
+  sharedAccessLogs SharedAccessLog[]
+  retentionPolicy DataRetentionPolicy?
+  accessReviews AccessReviewRecord[]
+  monitoringEvents MonitoringEvent[]
+}
+
+model Membership {
+  id        String           @id @default(uuid())
+  userId    String
+  orgId     String
+  role      MembershipRole   @default(member)
+  status    MembershipStatus @default(active)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  org  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, orgId])
+  @@index([orgId])
+  @@index([userId])
+}
+
+model OrgInvite {
+  id          String         @id @default(uuid())
+  orgId       String
+  email       String
+  role        MembershipRole @default(member)
+  inviteToken String         @unique @default(uuid())
+  expiresAt   DateTime
+  createdAt   DateTime       @default(now())
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@index([inviteToken])
+  @@index([email])
+}
+
+model User {
+  id        String     @id @default(uuid())
+  email     String     @unique
+  passwordHash String?
+  createdAt DateTime   @default(now())
+
+  profile   Profile?
+  checkins  Checkin[]
+  snapshots Snapshot[]
+  weeklyReports WeeklyReport[]
+  connectors Connector[]
+  oauthStates OAuthState[]
+  events Event[]
+  auditLogs AuditLog[]
+  scenarioPacks ScenarioPack[]
+  scenarioRuns ScenarioRun[]
+  personalizationProfile PersonalizationProfile?
+  actionFeedback ActionFeedback[]
+  memberships Membership[]
+  sharedDataOwner SharingConsent[] @relation("SharedDataOwner")
+  sharedDataViewer SharingConsent[] @relation("SharedDataViewer")
+  accessLogOwner SharedAccessLog[] @relation("AccessLogOwner")
+  accessLogViewer SharedAccessLog[] @relation("AccessLogViewer")
+  deletionRequests DeletionRequest[]
+  accessReviews AccessReviewRecord[]
+  monitoringEvents MonitoringEvent[]
+}
+
+enum WorkPattern {
+  day
+  night
+  mixed
+  unemployed
+}
+
+enum PriorityBias {
+  stability_first
+  income_first
+  growth_first
+}
+
+enum ConnectorProvider {
+  google_calendar
+}
+
+enum ConnectorStatus {
+  disconnected
+  connected
+  error
+}
+
+enum ConnectorRunStatus {
+  success
+  error
+}
+
+enum EventKind {
+  calendar_busy_block
+}
+
+enum BaselineSource {
+  latest_checkin
+  custom_checkin
+}
+
+enum ScenarioRunType {
+  simulate
+  compare
+}
+
+enum FocusPreference {
+  deep_work
+  mixed
+  light_tasks
+}
+
+enum FeedbackType {
+  helped
+  neutral
+  did_not_help
+}
+
+enum ConsentScope {
+  weekly_summary_only
+  daily_scores_only
+  daily_scores_and_flags
+  daily_plan_redacted
+  scenario_reports_redacted
+  insights_metrics_only
+}
+
+enum ConsentStatus {
+  active
+  revoked
+}
+
+enum SharedAccessAction {
+  view_weekly
+  view_today
+  view_history
+  view_scenarios
+  view_insights
+}
+
+model Profile {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  timezone    String
+  wake_window_start String
+  wake_window_end   String
+  sleep_window_start String
+  sleep_window_end   String
+  work_pattern WorkPattern
+  max_daily_focus_blocks Int @default(2)
+  priority_bias PriorityBias @default(stability_first)
+  compliance_domains String[] @default(["bills", "visa/legal"])
+  onboarding_completed_at DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Checkin {
+  id        String   @id @default(uuid())
+  userId    String
+  orgId     String
+  createdAt DateTime @default(now())
+  payload   Json
+
+  user     User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  org      Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  snapshot Snapshot?
+
+  @@index([userId, createdAt])
+  @@index([orgId])
+}
+
+model Snapshot {
+  id                 String   @id @default(uuid())
+  userId             String
+  orgId              String
+  checkinId          String   @unique
+  createdAt          DateTime @default(now())
+  output             Json
+  lifeStabilityScore Int
+  flags              Json
+
+  user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  org     Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  checkin Checkin      @relation(fields: [checkinId], references: [id], onDelete: Cascade)
+  actionFeedback ActionFeedback[]
+
+  @@index([userId, createdAt])
+  @@index([orgId])
+}
+
+model WeeklyReport {
+  id        String   @id @default(uuid())
+  userId    String
+  orgId     String
+  weekStart DateTime
+  weekEnd   DateTime
+  content   Json
+  createdAt DateTime @default(now())
+
+  user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  org  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, weekStart])
+  @@index([userId, weekStart])
+  @@index([orgId])
+}
+
+model Connector {
+  id                   String            @id @default(uuid())
+  userId               String
+  orgId                String
+  provider             ConnectorProvider
+  status               ConnectorStatus   @default(disconnected)
+  encryptedAccessToken String?
+  encryptedRefreshToken String?
+  expiresAt            DateTime?
+  metadata             Json              @default("{}")
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+
+  user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  org  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  runs ConnectorRun[]
+
+  @@unique([userId, provider])
+  @@index([orgId])
+}
+
+model OAuthState {
+  id        String            @id @default(uuid())
+  userId    String
+  provider  ConnectorProvider
+  state     String            @unique
+  createdAt DateTime          @default(now())
+  expiresAt DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, provider])
+}
+
+model ConnectorRun {
+  id            String             @id @default(uuid())
+  connectorId   String
+  orgId         String
+  startedAt     DateTime           @default(now())
+  finishedAt    DateTime?
+  status        ConnectorRunStatus
+  fetchedCount  Int                @default(0)
+  upsertedCount Int                @default(0)
+  errorMessage  String?
+
+  connector Connector    @relation(fields: [connectorId], references: [id], onDelete: Cascade)
+  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([connectorId, startedAt])
+  @@index([orgId])
+}
+
+model Event {
+  id             String            @id @default(uuid())
+  userId         String
+  orgId          String
+  sourceProvider ConnectorProvider
+  sourceId       String
+  kind           EventKind
+  startTs        DateTime
+  endTs          DateTime
+  timezone       String
+  title          String?
+  location       String?
+  isAllDay       Boolean           @default(false)
+  metadata       Json
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  org  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, sourceProvider, sourceId])
+  @@index([userId, sourceProvider, startTs])
+  @@index([orgId])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String
+  eventType String
+  createdAt DateTime @default(now())
+  metadata  Json?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+model ScenarioPack {
+  id             String         @id @default(uuid())
+  userId         String
+  orgId          String
+  name           String
+  description    String?
+  baselineSource BaselineSource @default(latest_checkin)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  scenarios Scenario[]
+  runs      ScenarioRun[]
+
+  @@index([userId, updatedAt])
+  @@index([orgId])
+}
+
+model Scenario {
+  id             String       @id @default(uuid())
+  scenarioPackId String
+  orgId          String
+  scenarioId     String
+  type           String
+  params         Json
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  pack ScenarioPack @relation(fields: [scenarioPackId], references: [id], onDelete: Cascade)
+  org  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([scenarioPackId, createdAt])
+  @@index([orgId])
+}
+
+model ScenarioRun {
+  id             String          @id @default(uuid())
+  userId         String
+  orgId          String
+  scenarioPackId String?
+  runType        ScenarioRunType
+  baselineRef    Json
+  resultJson     Json
+  createdAt      DateTime        @default(now())
+
+  user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  org  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  scenarioPack ScenarioPack? @relation(fields: [scenarioPackId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([scenarioPackId, createdAt])
+  @@index([orgId])
+}
+
+model PersonalizationProfile {
+  id             String          @id @default(uuid())
+  userId         String          @unique
+  orgId          String
+  weights        Json
+  riskAversion   Float           @default(0.6)
+  focusPreference FocusPreference @default(mixed)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  org  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([orgId])
+}
+
+model ActionFeedback {
+  id               String       @id @default(uuid())
+  userId           String
+  orgId            String
+  snapshotId       String
+  actionTitle      String
+  actionCategory   String
+  scheduled        Boolean
+  feedback         FeedbackType
+  perceivedEffort  Int?
+  perceivedImpact  Int?
+  comment          String?
+  createdAt        DateTime     @default(now())
+
+  user     User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  org      Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  snapshot Snapshot     @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([orgId])
+}
+
+model SharingConsent {
+  id            String        @id @default(uuid())
+  orgId         String
+  ownerUserId   String
+  viewerUserId  String
+  scope         ConsentScope
+  status        ConsentStatus @default(active)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  revokedAt     DateTime?
+
+  org           Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  owner         User         @relation("SharedDataOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  viewer        User         @relation("SharedDataViewer", fields: [viewerUserId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, ownerUserId, viewerUserId, scope])
+  @@index([orgId, ownerUserId])
+  @@index([orgId, viewerUserId])
+  @@index([ownerUserId, viewerUserId])
+}
+
+model SharedAccessLog {
+  id           String             @id @default(uuid())
+  orgId        String
+  ownerUserId  String
+  viewerUserId String
+  action       SharedAccessAction
+  metadata     Json?
+  createdAt    DateTime           @default(now())
+
+  org          Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  owner        User         @relation("AccessLogOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  viewer       User         @relation("AccessLogViewer", fields: [viewerUserId], references: [id], onDelete: Cascade)
+
+  @@index([ownerUserId, createdAt])
+  @@index([viewerUserId, createdAt])
+  @@index([orgId])
+}
+
+model DataRetentionPolicy {
+  id                         String   @id @default(uuid())
+  orgId                      String   @unique
+  retentionDaysSnapshots     Int      @default(365)
+  retentionDaysAudit         Int      @default(730)
+  retentionDaysAccessLogs    Int      @default(180)
+  retentionDaysFeedback      Int      @default(365)
+  updatedAt                  DateTime @updatedAt
+  createdAt                  DateTime @default(now())
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+}
+
+model DeletionRequest {
+  id        String   @id @default(uuid())
+  userId    String
+  orgId     String?
+  tokenHash String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+  @@index([tokenHash])
+}
+
+model AccessReviewRecord {
+  id               String    @id @default(uuid())
+  orgId            String
+  reviewerUserId   String
+  periodStart      DateTime
+  periodEnd        DateTime
+  status           String    @default("created") // "created" | "completed"
+  notes            String?   // Sensitive - never in audit metadata
+  evidenceHash     String?   // SHA256 hash of evidence JSON at creation
+  completionHash   String?   // SHA256 hash of evidence JSON at completion
+  createdAt        DateTime  @default(now())
+  completedAt      DateTime?
+
+  org      Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  reviewer User         @relation(fields: [reviewerUserId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, createdAt])
+  @@index([reviewerUserId])
+}
+
+model MonitoringEvent {
+  id        String   @id @default(uuid())
+  eventType String   // "CONNECTOR_SYNC_FAILURE" | "RETENTION_PURGE_FAILURE" | "AUTH_FAILURE_PATTERN" etc
+  orgId     String?
+  userId    String?
+  metadata  String?  // JSON - safe metadata only, no sensitive data
+  createdAt DateTime @default(now())
+
+  org  Organization? @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, createdAt])
+  @@index([eventType, createdAt])
+}
