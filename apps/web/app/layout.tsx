@@ -1,28 +1,37 @@
 import "./globals.css";
-import Header from "./components/header";
+import { Inter, JetBrains_Mono } from "next/font/google";
 import { AuthProvider } from "./components/auth-provider";
 import { OrgProvider } from "./components/org-provider";
 
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+  display: "swap",
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-jetbrains-mono",
+  display: "swap",
+});
+
 export const metadata = {
   title: "AI Life Ops",
-  description: "Operator-grade decision orchestration"
+  description: "Operator-grade decision orchestration",
 };
 
 export default function RootLayout({
-  children
+  children,
 }: {
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body className="min-h-screen text-slate-900 antialiased">
+    <html lang="en" className="dark">
+      <body
+        className={`${inter.variable} ${jetbrainsMono.variable} min-h-screen antialiased`}
+      >
         <AuthProvider>
-          <OrgProvider>
-            <Header />
-            <main className="mx-auto w-full max-w-6xl px-5 py-10">
-              {children}
-            </main>
-          </OrgProvider>
+          <OrgProvider>{children}</OrgProvider>
         </AuthProvider>
       </body>
     </html>
