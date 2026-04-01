@@ -3,6 +3,12 @@
 import { useState, useEffect } from "react";
 import { apiClient } from "../../lib/api";
 import type { PersonalizationResponse } from "@ai-life-ops/shared";
+import { AppShell } from "@/components/layout/app-shell";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { Label } from "@/components/ui/label";
 
 type Weights = {
   energy: number;
@@ -21,7 +27,9 @@ export default function PersonalizationSettings() {
     stability: 0.2,
   });
   const [riskAversion, setRiskAversion] = useState(0.6);
-  const [focusPreference, setFocusPreference] = useState<"deep_work" | "mixed" | "light_tasks">("mixed");
+  const [focusPreference, setFocusPreference] = useState<
+    "deep_work" | "mixed" | "light_tasks"
+  >("mixed");
   const [isDefault, setIsDefault] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -32,12 +40,15 @@ export default function PersonalizationSettings() {
 
   async function loadSettings() {
     try {
-      const response = await apiClient<PersonalizationResponse>("GET", "/api/personalization");
+      const response = await apiClient<PersonalizationResponse>(
+        "GET",
+        "/api/personalization"
+      );
       setWeights(response.weights);
       setRiskAversion(response.riskAversion);
       setFocusPreference(response.focusPreference);
       setIsDefault(response.isDefault);
-    } catch (err) {
+    } catch {
       setMessage("Failed to load settings");
     }
   }
@@ -47,18 +58,17 @@ export default function PersonalizationSettings() {
     setMessage("");
 
     try {
-      const response = await apiClient<PersonalizationResponse>("PUT", "/api/personalization", {
-        weights,
-        riskAversion,
-        focusPreference,
-      });
-
+      const response = await apiClient<PersonalizationResponse>(
+        "PUT",
+        "/api/personalization",
+        { weights, riskAversion, focusPreference }
+      );
       setWeights(response.weights);
       setRiskAversion(response.riskAversion);
       setFocusPreference(response.focusPreference);
       setIsDefault(false);
       setMessage("Settings saved successfully");
-    } catch (err) {
+    } catch {
       setMessage("Failed to save settings");
     } finally {
       setSaving(false);
@@ -73,121 +83,185 @@ export default function PersonalizationSettings() {
   const isValid = weightSum >= 0.95 && weightSum <= 1.05;
 
   return (
-    <div className="max-w-3xl mx-auto p-8">
-      <h1 className="text-3xl font-bold mb-2">Personalization</h1>
-      <p className="text-gray-600 mb-8">
-        Adjust how the engine ranks actions. Changes are bounded (±0.03 per update) to prevent runaway optimization.
-      </p>
-
-      {isDefault && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-          <p className="text-sm text-blue-800">
-            You're using default settings. Adjust the sliders below to personalize recommendations.
+    <AppShell>
+      <div className="space-y-6 max-w-2xl">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Personalization</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Adjust how the engine ranks actions. Changes are bounded (±0.03 per
+            update) to prevent runaway optimization.
           </p>
         </div>
-      )}
 
-      <div className="space-y-6 mb-8">
-        <h2 className="text-xl font-semibold">Category Weights</h2>
-        <p className="text-sm text-gray-600">
-          Higher weight = actions in that category rank higher. Must sum to ~1.0.
-        </p>
+        {isDefault && (
+          <Card className="border-primary/20 bg-primary/5">
+            <CardContent className="pt-4 pb-4">
+              <p className="text-sm text-foreground">
+                You&apos;re using default settings. Adjust the sliders below to
+                personalize recommendations.
+              </p>
+            </CardContent>
+          </Card>
+        )}
 
-        {(["energy", "money", "obligations", "growth", "stability"] as const).map((category) => (
-          <div key={category} className="space-y-2">
+        {/* Category weights */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base">Category Weights</CardTitle>
+              <Badge
+                variant={isValid ? "default" : "destructive"}
+                className="font-mono text-xs"
+              >
+                Sum: {weightSum.toFixed(2)}
+              </Badge>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Higher weight = actions in that category rank higher. Must sum to
+              ~1.0.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            {(
+              [
+                "energy",
+                "money",
+                "obligations",
+                "growth",
+                "stability",
+              ] as const
+            ).map((category) => (
+              <div key={category} className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <Label className="capitalize">{category}</Label>
+                  <span className="text-sm font-mono text-muted-foreground">
+                    {weights[category].toFixed(2)}
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="0.05"
+                  max="0.40"
+                  step="0.01"
+                  value={weights[category]}
+                  onChange={(e) =>
+                    updateWeight(category, parseFloat(e.target.value))
+                  }
+                  className="w-full accent-primary"
+                />
+              </div>
+            ))}
+            {!isValid && (
+              <p className="text-xs text-destructive">
+                Weights must sum to 0.95–1.05
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Risk aversion */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Risk Aversion</CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Higher = prioritize safety and compliance. Lower = prioritize growth.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-3">
             <div className="flex justify-between items-center">
-              <label className="text-sm font-medium capitalize">{category}</label>
-              <span className="text-sm text-gray-600">{weights[category].toFixed(2)}</span>
+              <Label>Risk Aversion</Label>
+              <span className="text-sm font-mono text-muted-foreground">
+                {riskAversion.toFixed(2)}
+              </span>
             </div>
             <input
               type="range"
-              min="0.05"
-              max="0.40"
-              step="0.01"
-              value={weights[category]}
-              onChange={(e) => updateWeight(category, parseFloat(e.target.value))}
-              className="w-full"
+              min="0"
+              max="1"
+              step="0.05"
+              value={riskAversion}
+              onChange={(e) => setRiskAversion(parseFloat(e.target.value))}
+              className="w-full accent-primary"
             />
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>Growth-focused</span>
+              <span>Balanced</span>
+              <span>Safety-focused</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Focus preference */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Focus Preference</CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Influences how the engine schedules your day.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <select
+              value={focusPreference}
+              onChange={(e) =>
+                setFocusPreference(e.target.value as typeof focusPreference)
+              }
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+            >
+              <option value="deep_work">
+                Deep Work (longer blocks, fewer switches)
+              </option>
+              <option value="mixed">Mixed (balanced)</option>
+              <option value="light_tasks">
+                Light Tasks (shorter blocks, more variety)
+              </option>
+            </select>
+          </CardContent>
+        </Card>
+
+        {/* Message */}
+        {message && (
+          <div
+            className={`rounded-lg px-4 py-3 text-sm ${
+              message.includes("success")
+                ? "border border-green-500/30 bg-green-500/10 text-green-400"
+                : "border border-destructive/30 bg-destructive/10 text-destructive"
+            }`}
+          >
+            {message}
           </div>
-        ))}
+        )}
 
-        <div className="text-sm">
-          <span className={`font-medium ${isValid ? "text-green-600" : "text-red-600"}`}>
-            Sum: {weightSum.toFixed(2)}
-          </span>
-          {!isValid && <span className="text-red-600 ml-2">(must be 0.95-1.05)</span>}
-        </div>
+        <Button onClick={handleSave} disabled={saving || !isValid} className="w-full">
+          {saving ? "Saving..." : "Save Personalization"}
+        </Button>
+
+        <Separator />
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">How Personalization Works</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="text-sm text-muted-foreground space-y-1.5 list-disc pl-5">
+              <li>
+                Actions are first ranked by risk reduction (safety always comes
+                first)
+              </li>
+              <li>Weights influence ranking among equally safe actions</li>
+              <li>
+                The system learns from your feedback with bounded updates (±0.03
+                max)
+              </li>
+              <li>
+                Minimum 8 feedback entries required before weight adjustments
+              </li>
+              <li>
+                Privacy: feedback never includes raw notes, only aggregated patterns
+              </li>
+            </ul>
+          </CardContent>
+        </Card>
       </div>
-
-      <div className="space-y-6 mb-8">
-        <h2 className="text-xl font-semibold">Risk Aversion</h2>
-        <p className="text-sm text-gray-600">
-          Higher = prioritize safety and compliance. Lower = prioritize growth and experimentation.
-        </p>
-
-        <div className="space-y-2">
-          <div className="flex justify-between items-center">
-            <label className="text-sm font-medium">Risk Aversion</label>
-            <span className="text-sm text-gray-600">{riskAversion.toFixed(2)}</span>
-          </div>
-          <input
-            type="range"
-            min="0"
-            max="1"
-            step="0.05"
-            value={riskAversion}
-            onChange={(e) => setRiskAversion(parseFloat(e.target.value))}
-            className="w-full"
-          />
-          <div className="flex justify-between text-xs text-gray-500">
-            <span>Growth-focused</span>
-            <span>Balanced</span>
-            <span>Safety-focused</span>
-          </div>
-        </div>
-      </div>
-
-      <div className="space-y-6 mb-8">
-        <h2 className="text-xl font-semibold">Focus Preference</h2>
-        <p className="text-sm text-gray-600">
-          Influences how the engine schedules your day: deep work blocks, balanced, or lighter tasks.
-        </p>
-
-        <select
-          value={focusPreference}
-          onChange={(e) => setFocusPreference(e.target.value as typeof focusPreference)}
-          className="w-full p-2 border border-gray-300 rounded-lg"
-        >
-          <option value="deep_work">Deep Work (longer blocks, fewer switches)</option>
-          <option value="mixed">Mixed (balanced)</option>
-          <option value="light_tasks">Light Tasks (shorter blocks, more variety)</option>
-        </select>
-      </div>
-
-      {message && (
-        <div className={`p-4 rounded-lg mb-4 ${message.includes("success") ? "bg-green-50 text-green-800" : "bg-red-50 text-red-800"}`}>
-          {message}
-        </div>
-      )}
-
-      <button
-        onClick={handleSave}
-        disabled={saving || !isValid}
-        className="w-full py-3 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed font-medium"
-      >
-        {saving ? "Saving..." : "Save Personalization"}
-      </button>
-
-      <div className="mt-8 p-4 bg-gray-50 rounded-lg">
-        <h3 className="font-semibold mb-2">How Personalization Works</h3>
-        <ul className="text-sm text-gray-700 space-y-1 list-disc list-inside">
-          <li>Actions are first ranked by risk reduction (safety always comes first)</li>
-          <li>Weights influence ranking among equally safe actions</li>
-          <li>The system learns from your feedback (👍/👎) with bounded updates (±0.03 max)</li>
-          <li>Minimum 8 feedback entries required before weight adjustments</li>
-          <li>Privacy: feedback never includes raw notes, only aggregated patterns</li>
-        </ul>
-      </div>
-    </div>
+    </AppShell>
   );
 }

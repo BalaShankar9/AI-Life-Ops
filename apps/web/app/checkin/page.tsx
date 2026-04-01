@@ -4,6 +4,9 @@ import { ConnectorsResponseSchema } from "@ai-life-ops/shared";
 
 import RequireAuth from "../components/require-auth";
 import CheckinForm from "./checkin-form";
+import { AppShell } from "@/components/layout/app-shell";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL ||
@@ -12,50 +15,74 @@ const API_BASE_URL =
 
 export default async function CheckinPage() {
   const calendarStatus = await loadCalendarStatus();
+
+  const calendarBadgeVariant =
+    calendarStatus === "connected"
+      ? "default"
+      : calendarStatus === "disconnected"
+        ? "outline"
+        : "secondary";
+
+  const calendarText =
+    calendarStatus === "connected"
+      ? "Calendar connected. Busy blocks will shape today's plan."
+      : calendarStatus === "disconnected"
+        ? "Calendar not connected. Connect it for schedule-aware plans."
+        : "Calendar status unavailable right now.";
+
   return (
     <RequireAuth>
-      <section className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
-        <div className="animate-rise rounded-3xl border border-slate-200/70 bg-white/80 p-8 shadow-sm">
-          <h1 className="text-2xl font-semibold text-slate-900">
-            Daily check-in
-          </h1>
-          <p className="mt-2 text-sm text-slate-600">
-            Capture today&apos;s signals so the engine can generate a calm,
-            risk-aware plan.
-          </p>
-          <div className="mt-6">
-            <CheckinForm />
+      <AppShell>
+        <div className="space-y-6">
+          {/* Page header */}
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Daily check-in</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Capture today&apos;s signals so the engine can generate a calm, risk-aware plan.
+            </p>
+          </div>
+
+          <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
+            {/* Main form */}
+            <Card>
+              <CardContent className="pt-6">
+                <CheckinForm />
+              </CardContent>
+            </Card>
+
+            {/* Sidebar info */}
+            <div className="space-y-4">
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                    How it works
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="text-sm text-muted-foreground">
+                  The engine scores five life systems, raises risk flags, and builds
+                  a top-three plan. It will never overload the day.
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-sm font-semibold text-foreground">
+                      Calendar
+                    </CardTitle>
+                    <Badge variant={calendarBadgeVariant} className="text-xs">
+                      {calendarStatus === "connected" ? "Connected" : calendarStatus === "disconnected" ? "Disconnected" : "Unknown"}
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="text-sm text-muted-foreground">
+                  {calendarText}
+                </CardContent>
+              </Card>
+            </div>
           </div>
         </div>
-        <aside className="animate-rise space-y-4 rounded-3xl border border-slate-200/70 bg-white/80 p-6 text-sm text-slate-600 shadow-sm">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-              How it works
-            </p>
-            <p className="mt-2">
-              The engine scores five life systems, raises risk flags, and builds
-              a top-three plan. It will never overload the day.
-            </p>
-          </div>
-          <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
-            <p className="font-semibold text-slate-700">Session</p>
-            <p className="mt-1">
-              You are signed in with a secure session cookie. Data stays tied to
-              your account.
-            </p>
-          </div>
-          <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
-            <p className="font-semibold text-slate-700">Calendar</p>
-            <p className="mt-1">
-              {calendarStatus === "connected"
-                ? "Calendar connected. Busy blocks will shape today's plan."
-                : calendarStatus === "disconnected"
-                  ? "Calendar not connected. Connect it for schedule-aware plans."
-                  : "Calendar status unavailable right now."}
-            </p>
-          </div>
-        </aside>
-      </section>
+      </AppShell>
     </RequireAuth>
   );
 }
@@ -63,7 +90,7 @@ export default async function CheckinPage() {
 async function loadCalendarStatus(): Promise<
   "connected" | "disconnected" | "unknown"
 > {
-  const cookieHeader = getCookieHeader();
+  const cookieHeader = await getCookieHeader();
   if (!cookieHeader) {
     return "unknown";
   }
@@ -73,38 +100,31 @@ async function loadCalendarStatus(): Promise<
       method: "GET",
       headers: {
         accept: "application/json",
-        cookie: cookieHeader
+        cookie: cookieHeader,
       },
-      cache: "no-store"
+      cache: "no-store",
     });
 
     const text = await response.text();
-    if (!response.ok) {
-      return "unknown";
-    }
+    if (!response.ok) return "unknown";
     const json = text ? JSON.parse(text) : null;
     const parsed = ConnectorsResponseSchema.safeParse(json);
-    if (!parsed.success) {
-      return "unknown";
-    }
+    if (!parsed.success) return "unknown";
 
     const connector = parsed.data.data.connectors.find(
       (item) => item.provider === "google_calendar"
     );
-    if (!connector) {
-      return "disconnected";
-    }
-
+    if (!connector) return "disconnected";
     return connector.status === "connected" ? "connected" : "disconnected";
   } catch {
     return "unknown";
   }
 }
 
-function getCookieHeader(): string {
-  const cookieStore = cookies();
+async function getCookieHeader(): Promise<string> {
+  const cookieStore = await cookies();
   return cookieStore
     .getAll()
-    .map((cookie) => `${cookie.name}=${cookie.value}`)
+    .map((cookie: { name: string; value: string }) => `${cookie.name}=${cookie.value}`)
     .join("; ");
 }

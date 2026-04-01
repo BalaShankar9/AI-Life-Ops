@@ -1,44 +1,42 @@
+import { Suspense } from "react";
 import RequireAuth from "../components/require-auth";
 import OnboardingForm from "./onboarding-form";
 
 export default function OnboardingPage() {
   return (
     <RequireAuth requireOnboarding={false}>
-      <section className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
-        <div className="animate-rise rounded-3xl border border-slate-200/70 bg-white/80 p-8 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-            Onboarding
-          </p>
-          <h1 className="mt-3 text-2xl font-semibold text-slate-900">
-            Set your operating profile
-          </h1>
-          <p className="mt-2 text-sm text-slate-600">
-            Capture the minimum context the engine needs to keep plans realistic
-            and aligned to your constraints.
-          </p>
-          <div className="mt-6">
-            <OnboardingForm />
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="w-full max-w-lg space-y-6">
+          {/* Header */}
+          <div className="text-center space-y-2">
+            <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-secondary mx-auto">
+              <span className="text-2xl font-bold text-white">O</span>
+            </div>
+            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+              Onboarding
+            </p>
+            <h1 className="text-2xl font-bold text-foreground">
+              Set your operating profile
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Capture the minimum context the engine needs to keep plans realistic
+              and aligned to your constraints.
+            </p>
           </div>
+
+          {/* Form card */}
+          <div className="rounded-xl border border-border bg-card p-8 shadow-lg">
+            <Suspense fallback={<div className="h-48 animate-pulse rounded-lg bg-muted" />}>
+              <OnboardingForm />
+            </Suspense>
+          </div>
+
+          {/* Info */}
+          <p className="text-center text-xs text-muted-foreground">
+            We store only schedule windows and focus caps. No sensitive content or credentials.
+          </p>
         </div>
-        <aside className="animate-rise space-y-4 rounded-3xl border border-slate-200/70 bg-white/80 p-6 text-sm text-slate-600 shadow-sm">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-              Privacy by design
-            </p>
-            <p className="mt-2">
-              We store only schedule windows, a focus cap, and compliance
-              domains. No sensitive content or credentials.
-            </p>
-          </div>
-          <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
-            <p className="font-semibold text-slate-700">How it is used</p>
-            <p className="mt-1">
-              The deterministic engine references this profile to shape timing,
-              cap deep work, and tune priorities.
-            </p>
-          </div>
-        </aside>
-      </section>
+      </div>
     </RequireAuth>
   );
 }

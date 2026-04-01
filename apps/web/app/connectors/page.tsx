@@ -5,6 +5,7 @@ import type { ConnectorSummary } from "@ai-life-ops/shared";
 
 import RequireAuth from "../components/require-auth";
 import ConnectorsView from "./connectors-view";
+import { AppShell } from "@/components/layout/app-shell";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL ||
@@ -12,7 +13,7 @@ const API_BASE_URL =
   "http://localhost:4000";
 
 export default async function ConnectorsPage({
-  searchParams
+  searchParams,
 }: {
   searchParams?: Record<string, string | string[]>;
 }) {
@@ -26,19 +27,21 @@ export default async function ConnectorsPage({
 
   return (
     <RequireAuth allowDuringLoading>
-      <section className="space-y-6">
-        <div className="animate-rise">
-          <h1 className="text-2xl font-semibold text-slate-900">Connectors</h1>
-          <p className="mt-2 text-sm text-slate-600">
-            Sync external data sources into a secure, canonical events store.
-          </p>
+      <AppShell>
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Connectors</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Sync external data sources into a secure, canonical events store.
+            </p>
+          </div>
+          <ConnectorsView
+            initialConnectors={connectors}
+            initialError={error}
+            connectedProvider={connected}
+          />
         </div>
-        <ConnectorsView
-          initialConnectors={connectors}
-          initialError={error}
-          connectedProvider={connected}
-        />
-      </section>
+      </AppShell>
     </RequireAuth>
   );
 }
@@ -47,19 +50,17 @@ async function loadConnectors(): Promise<{
   connectors: ConnectorSummary[] | null;
   error: string | null;
 }> {
-  const cookieHeader = getCookieHeader();
-  if (!cookieHeader) {
-    return { connectors: null, error: null };
-  }
+  const cookieHeader = await getCookieHeader();
+  if (!cookieHeader) return { connectors: null, error: null };
 
   try {
     const response = await fetch(`${API_BASE_URL}/api/connectors`, {
       method: "GET",
       headers: {
         accept: "application/json",
-        cookie: cookieHeader
+        cookie: cookieHeader,
       },
-      cache: "no-store"
+      cache: "no-store",
     });
 
     const { json, text } = await parseResponse(response);
@@ -67,7 +68,7 @@ async function loadConnectors(): Promise<{
     if (!response.ok) {
       return {
         connectors: null,
-        error: extractErrorMessage(json, text, response.status)
+        error: extractErrorMessage(json, text, response.status),
       };
     }
 
@@ -82,11 +83,11 @@ async function loadConnectors(): Promise<{
   }
 }
 
-function getCookieHeader(): string {
-  const cookieStore = cookies();
+async function getCookieHeader(): Promise<string> {
+  const cookieStore = await cookies();
   return cookieStore
     .getAll()
-    .map((cookie) => `${cookie.name}=${cookie.value}`)
+    .map((cookie: { name: string; value: string }) => `${cookie.name}=${cookie.value}`)
     .join("; ");
 }
 
@@ -94,9 +95,7 @@ async function parseResponse(
   response: Response
 ): Promise<{ json: unknown | null; text: string }> {
   const text = await response.text();
-  if (!text) {
-    return { json: null, text: "" };
-  }
+  if (!text) return { json: null, text: "" };
   try {
     return { json: JSON.parse(text), text };
   } catch {
@@ -109,9 +108,7 @@ function extractErrorMessage(
   text: string,
   status: number
 ): string {
-  if (status === 401 || status === 403) {
-    return "Please sign in to continue.";
-  }
+  if (status === 401 || status === 403) return "Please sign in to continue.";
 
   if (payload && typeof payload === "object") {
     const record = payload as Record<string, unknown>;
@@ -119,15 +116,10 @@ function extractErrorMessage(
       record.error && typeof record.error === "object"
         ? (record.error as Record<string, unknown>)
         : null;
-    if (error && typeof error.message === "string") {
-      return error.message;
-    }
+    if (error && typeof error.message === "string") return error.message;
   }
 
   const trimmed = text.trim();
-  if (trimmed) {
-    return trimmed.slice(0, 180);
-  }
-
+  if (trimmed) return trimmed.slice(0, 180);
   return "Unable to load connectors.";
 }

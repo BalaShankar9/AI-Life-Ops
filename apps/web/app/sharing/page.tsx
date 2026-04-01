@@ -1,7 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { AppShell } from "@/components/layout/app-shell";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { Label } from "@/components/ui/label";
 
 type ConsentSummary = {
   id: string;
@@ -21,16 +26,21 @@ type OrgMember = {
 };
 
 const SCOPE_DESCRIPTIONS: Record<string, string> = {
-  weekly_summary_only: "Weekly reports only: summary, score trends, top risks, next week focus",
-  daily_scores_only: "Daily life stability scores and breakdown (energy/money/obligations/growth/stability)",
-  daily_scores_and_flags: "Daily scores + risk flags (instability, energy collapse, growth stall, etc.)",
-  daily_plan_redacted: "Daily scores + flags + plan (priorities and schedule - no personal notes)",
-  scenario_reports_redacted: "Scenario simulation reports and analysis (redacted assumptions)",
-  insights_metrics_only: "Personalization insights: score trends, feedback patterns, adaptations (no free-text)"
+  weekly_summary_only:
+    "Weekly reports only: summary, score trends, top risks, next week focus",
+  daily_scores_only:
+    "Daily life stability scores and breakdown (energy/money/obligations/growth/stability)",
+  daily_scores_and_flags:
+    "Daily scores + risk flags (instability, energy collapse, growth stall, etc.)",
+  daily_plan_redacted:
+    "Daily scores + flags + plan (priorities and schedule - no personal notes)",
+  scenario_reports_redacted:
+    "Scenario simulation reports and analysis (redacted assumptions)",
+  insights_metrics_only:
+    "Personalization insights: score trends, feedback patterns, adaptations (no free-text)",
 };
 
 export default function SharingPage() {
-  const router = useRouter();
   const [consents, setConsents] = useState<ConsentSummary[]>([]);
   const [members, setMembers] = useState<OrgMember[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,16 +51,23 @@ export default function SharingPage() {
   useEffect(() => {
     async function load() {
       try {
+        const orgId =
+          typeof window !== "undefined"
+            ? localStorage.getItem("activeOrgId") || ""
+            : "";
         const [consentsRes, membersRes] = await Promise.all([
-          fetch("http://localhost:4000/api/sharing/consents", { credentials: "include" }),
-          fetch("http://localhost:4000/api/orgs/" + (localStorage.getItem("activeOrgId") || "") + "/members", { credentials: "include" })
+          fetch("http://localhost:4000/api/sharing/consents", {
+            credentials: "include",
+          }),
+          fetch(`http://localhost:4000/api/orgs/${orgId}/members`, {
+            credentials: "include",
+          }),
         ]);
 
         if (consentsRes.ok) {
           const data = await consentsRes.json();
           if (data.ok) setConsents(data.data.consents || []);
         }
-
         if (membersRes.ok) {
           const data = await membersRes.json();
           if (data.ok) setMembers(data.data.members || []);
@@ -76,8 +93,8 @@ export default function SharingPage() {
         credentials: "include",
         body: JSON.stringify({
           viewer_user_id: selectedViewer,
-          scope: selectedScope
-        })
+          scope: selectedScope,
+        }),
       });
 
       if (response.ok) {
@@ -102,104 +119,153 @@ export default function SharingPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ viewer_user_id: viewerUserId, scope })
+        body: JSON.stringify({ viewer_user_id: viewerUserId, scope }),
       });
 
       if (response.ok) {
-        setConsents(consents.filter((c) => !(c.viewer_user_id === viewerUserId && c.scope === scope)));
+        setConsents(
+          consents.filter(
+            (c) => !(c.viewer_user_id === viewerUserId && c.scope === scope)
+          )
+        );
       }
     } catch (error) {
       console.error("Failed to revoke consent:", error);
     }
   };
 
-  if (loading) {
-    return <div className="text-center text-gray-500">Loading...</div>;
-  }
-
   return (
-    <div>
-      <h1 className="text-2xl font-bold mb-6">Sharing Controls</h1>
+    <AppShell>
+      <div className="space-y-6 max-w-2xl">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Sharing Controls</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Grant org members controlled, redacted access to your data.
+          </p>
+        </div>
 
-      <div className="bg-blue-50 border border-blue-200 rounded p-4 mb-6">
-        <p className="text-sm text-blue-900">
-          <strong>Privacy Note:</strong> All shared data is redacted. Viewers will never see your personal notes,
-          comments, or detailed assumptions. Only aggregate scores, trends, and safe metadata are shared.
-        </p>
-      </div>
+        {/* Privacy notice */}
+        <Card className="border-primary/20 bg-primary/5">
+          <CardContent className="pt-4 pb-4">
+            <p className="text-sm text-foreground">
+              <span className="font-semibold">Privacy note:</span> All shared data is
+              redacted. Viewers never see personal notes, comments, or detailed
+              assumptions — only aggregate scores, trends, and safe metadata.
+            </p>
+          </CardContent>
+        </Card>
 
-      <div className="bg-white border border-gray-200 rounded-lg p-6 mb-8">
-        <h2 className="text-xl font-semibold mb-4">Grant Access</h2>
-        <form onSubmit={handleGrant} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">Select Member</label>
-            <select
-              value={selectedViewer}
-              onChange={(e) => setSelectedViewer(e.target.value)}
-              className="w-full border border-gray-300 rounded px-3 py-2"
-              required
-            >
-              <option value="">-- Choose a member --</option>
-              {members
-                .filter((m) => m.status === "active" && m.role !== "owner")
-                .map((m) => (
-                  <option key={m.user_id} value={m.user_id}>
-                    {m.email} ({m.role})
-                  </option>
+        {/* Grant access */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Grant Access</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <div className="space-y-3">
+                {[...Array(2)].map((_, i) => (
+                  <div key={i} className="h-10 animate-pulse rounded-lg bg-muted" />
                 ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">Access Scope</label>
-            <select
-              value={selectedScope}
-              onChange={(e) => setSelectedScope(e.target.value)}
-              className="w-full border border-gray-300 rounded px-3 py-2"
-            >
-              {Object.entries(SCOPE_DESCRIPTIONS).map(([scope, desc]) => (
-                <option key={scope} value={scope}>
-                  {scope}
-                </option>
-              ))}
-            </select>
-            <p className="text-sm text-gray-600 mt-1">{SCOPE_DESCRIPTIONS[selectedScope]}</p>
-          </div>
-
-          <button
-            type="submit"
-            disabled={granting || !selectedViewer}
-            className="bg-blue-600 text-white px-4 py-2 rounded font-semibold hover:bg-blue-700 disabled:opacity-50"
-          >
-            {granting ? "Granting..." : "Grant Consent"}
-          </button>
-        </form>
-      </div>
-
-      <div className="bg-white border border-gray-200 rounded-lg p-6">
-        <h2 className="text-xl font-semibold mb-4">Active Consents ({consents.length})</h2>
-        {consents.length === 0 ? (
-          <p className="text-gray-500 text-sm">No active consents.</p>
-        ) : (
-          <div className="space-y-3">
-            {consents.map((c) => (
-              <div key={c.id} className="flex items-center justify-between border-b border-gray-100 pb-3">
-                <div>
-                  <div className="font-medium">{c.viewer_email}</div>
-                  <div className="text-sm text-gray-600">{c.scope}</div>
-                  <div className="text-xs text-gray-400">Granted {new Date(c.created_at).toLocaleDateString()}</div>
-                </div>
-                <button
-                  onClick={() => handleRevoke(c.viewer_user_id, c.scope)}
-                  className="text-red-600 text-sm font-semibold hover:underline"
-                >
-                  Revoke
-                </button>
               </div>
-            ))}
-          </div>
-        )}
+            ) : (
+              <form onSubmit={handleGrant} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="viewer">Select Member</Label>
+                  <select
+                    id="viewer"
+                    value={selectedViewer}
+                    onChange={(e) => setSelectedViewer(e.target.value)}
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                    required
+                  >
+                    <option value="">-- Choose a member --</option>
+                    {members
+                      .filter((m) => m.status === "active" && m.role !== "owner")
+                      .map((m) => (
+                        <option key={m.user_id} value={m.user_id}>
+                          {m.email} ({m.role})
+                        </option>
+                      ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="scope">Access Scope</Label>
+                  <select
+                    id="scope"
+                    value={selectedScope}
+                    onChange={(e) => setSelectedScope(e.target.value)}
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                  >
+                    {Object.entries(SCOPE_DESCRIPTIONS).map(([scope]) => (
+                      <option key={scope} value={scope}>
+                        {scope}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-muted-foreground">
+                    {SCOPE_DESCRIPTIONS[selectedScope]}
+                  </p>
+                </div>
+
+                <Button type="submit" disabled={granting || !selectedViewer}>
+                  {granting ? "Granting..." : "Grant Consent"}
+                </Button>
+              </form>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Active consents */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base">Active Consents</CardTitle>
+              <Badge variant="secondary">{consents.length}</Badge>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <div className="space-y-3">
+                {[...Array(2)].map((_, i) => (
+                  <div key={i} className="h-12 animate-pulse rounded-lg bg-muted" />
+                ))}
+              </div>
+            ) : consents.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No active consents.</p>
+            ) : (
+              <div className="space-y-3">
+                {consents.map((c, i) => (
+                  <div key={c.id}>
+                    {i > 0 && <Separator className="mb-3" />}
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium text-foreground">
+                          {c.viewer_email}
+                        </p>
+                        <Badge variant="outline" className="text-xs font-mono">
+                          {c.scope}
+                        </Badge>
+                        <p className="text-xs text-muted-foreground">
+                          Granted {new Date(c.created_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10 shrink-0"
+                        onClick={() => handleRevoke(c.viewer_user_id, c.scope)}
+                      >
+                        Revoke
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
-    </div>
+    </AppShell>
   );
 }

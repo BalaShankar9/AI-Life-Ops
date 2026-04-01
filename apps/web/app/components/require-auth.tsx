@@ -1,14 +1,14 @@
 "use client";
 
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { useAuth } from "./auth-provider";
 
-export default function RequireAuth({
+function RequireAuthInner({
   children,
   requireOnboarding = true,
-  allowDuringLoading = false
+  allowDuringLoading = false,
 }: {
   children: React.ReactNode;
   requireOnboarding?: boolean;
@@ -45,7 +45,7 @@ export default function RequireAuth({
     searchParams,
     onboardingCompleted,
     onboardingLoading,
-    requireOnboarding
+    requireOnboarding,
   ]);
 
   if (loading || (requireOnboarding && onboardingLoading)) {
@@ -53,7 +53,7 @@ export default function RequireAuth({
       return <>{children}</>;
     }
     return (
-      <div className="animate-rise rounded-3xl border border-slate-200/70 bg-white/80 p-6 text-sm text-slate-500 shadow-sm">
+      <div className="rounded-xl border border-border bg-card p-6 text-sm text-muted-foreground">
         Checking your session...
       </div>
     );
@@ -68,4 +68,31 @@ export default function RequireAuth({
   }
 
   return <>{children}</>;
+}
+
+export default function RequireAuth({
+  children,
+  requireOnboarding = true,
+  allowDuringLoading = false,
+}: {
+  children: React.ReactNode;
+  requireOnboarding?: boolean;
+  allowDuringLoading?: boolean;
+}) {
+  return (
+    <Suspense
+      fallback={
+        <div className="rounded-xl border border-border bg-card p-6 text-sm text-muted-foreground">
+          Checking your session...
+        </div>
+      }
+    >
+      <RequireAuthInner
+        requireOnboarding={requireOnboarding}
+        allowDuringLoading={allowDuringLoading}
+      >
+        {children}
+      </RequireAuthInner>
+    </Suspense>
+  );
 }

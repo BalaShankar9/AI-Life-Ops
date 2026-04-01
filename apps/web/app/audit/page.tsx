@@ -5,6 +5,7 @@ import type { AuditEvent } from "@ai-life-ops/shared";
 
 import RequireAuth from "../components/require-auth";
 import AuditView from "./audit-view";
+import { AppShell } from "@/components/layout/app-shell";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL ||
@@ -16,15 +17,17 @@ export default async function AuditPage() {
 
   return (
     <RequireAuth allowDuringLoading>
-      <section className="space-y-6">
-        <div className="animate-rise">
-          <h1 className="text-2xl font-semibold text-slate-900">Audit log</h1>
-          <p className="mt-2 text-sm text-slate-600">
-            Key account and system events for transparency.
-          </p>
+      <AppShell>
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Audit log</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Key account and system events for transparency.
+            </p>
+          </div>
+          <AuditView initialEvents={events} initialError={error} />
         </div>
-        <AuditView initialEvents={events} initialError={error} />
-      </section>
+      </AppShell>
     </RequireAuth>
   );
 }
@@ -33,19 +36,17 @@ async function loadAuditEvents(): Promise<{
   events: AuditEvent[] | null;
   error: string | null;
 }> {
-  const cookieHeader = getCookieHeader();
-  if (!cookieHeader) {
-    return { events: null, error: null };
-  }
+  const cookieHeader = await getCookieHeader();
+  if (!cookieHeader) return { events: null, error: null };
 
   try {
     const response = await fetch(`${API_BASE_URL}/api/audit?limit=100`, {
       method: "GET",
       headers: {
         accept: "application/json",
-        cookie: cookieHeader
+        cookie: cookieHeader,
       },
-      cache: "no-store"
+      cache: "no-store",
     });
 
     const { json, text } = await parseResponse(response);
@@ -53,7 +54,7 @@ async function loadAuditEvents(): Promise<{
     if (!response.ok) {
       return {
         events: null,
-        error: extractErrorMessage(json, text, response.status)
+        error: extractErrorMessage(json, text, response.status),
       };
     }
 
@@ -68,11 +69,11 @@ async function loadAuditEvents(): Promise<{
   }
 }
 
-function getCookieHeader(): string {
-  const cookieStore = cookies();
+async function getCookieHeader(): Promise<string> {
+  const cookieStore = await cookies();
   return cookieStore
     .getAll()
-    .map((cookie) => `${cookie.name}=${cookie.value}`)
+    .map((cookie: { name: string; value: string }) => `${cookie.name}=${cookie.value}`)
     .join("; ");
 }
 
@@ -80,9 +81,7 @@ async function parseResponse(
   response: Response
 ): Promise<{ json: unknown | null; text: string }> {
   const text = await response.text();
-  if (!text) {
-    return { json: null, text: "" };
-  }
+  if (!text) return { json: null, text: "" };
   try {
     return { json: JSON.parse(text), text };
   } catch {
@@ -95,9 +94,7 @@ function extractErrorMessage(
   text: string,
   status: number
 ): string {
-  if (status === 401 || status === 403) {
-    return "Please sign in to continue.";
-  }
+  if (status === 401 || status === 403) return "Please sign in to continue.";
 
   if (payload && typeof payload === "object") {
     const record = payload as Record<string, unknown>;
@@ -105,15 +102,10 @@ function extractErrorMessage(
       record.error && typeof record.error === "object"
         ? (record.error as Record<string, unknown>)
         : null;
-    if (error && typeof error.message === "string") {
-      return error.message;
-    }
+    if (error && typeof error.message === "string") return error.message;
   }
 
   const trimmed = text.trim();
-  if (trimmed) {
-    return trimmed.slice(0, 180);
-  }
-
+  if (trimmed) return trimmed.slice(0, 180);
   return "Unable to load audit log.";
 }
