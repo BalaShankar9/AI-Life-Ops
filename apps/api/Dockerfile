@@ -8,10 +8,11 @@ WORKDIR /app
 # Copy root package files for workspace resolution
 COPY package.json package-lock.json ./
 COPY apps/api/package.json apps/api/
+COPY apps/web/package.json apps/web/
 COPY packages/shared/package.json packages/shared/
 
 # Install all workspace dependencies
-RUN npm ci
+RUN npm ci --ignore-scripts
 
 # Copy source code
 COPY packages/shared/ packages/shared/
