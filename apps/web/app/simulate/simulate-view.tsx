@@ -150,10 +150,11 @@ export default function SimulateView() {
         return;
       }
 
-      const result = await compareScenarios({
-        scenarios: currentPack.scenarios,
-        pack_id: currentPack.id
-      });
+      const result = await compareScenarios(
+        currentPack.scenarios,
+        undefined,
+        currentPack.id
+      );
 
       setComparisonResult(result);
     } catch (err) {
