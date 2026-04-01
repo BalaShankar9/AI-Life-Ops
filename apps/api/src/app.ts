@@ -547,6 +547,7 @@ export function createApp() {
         const checkin = await tx.checkin.create({
           data: {
             userId: req.user!.id,
+            orgId: req.orgId!,
             payload: input
           }
         });
@@ -554,6 +555,7 @@ export function createApp() {
         const snapshotRecord = await tx.snapshot.create({
           data: {
             userId: req.user!.id,
+            orgId: req.orgId!,
             checkinId: checkin.id,
             output,
             lifeStabilityScore: output.life_stability_score,
@@ -629,7 +631,7 @@ export function createApp() {
       const input = PersonalizationRequestSchema.parse(req.body);
 
       // Normalize weights (clamp [0.05, 0.40], sum to 1.0)
-      const { weights, riskAversion, focusPreference } = input;
+      const { weights, risk_aversion, focus_preference } = input;
       const clamped = Object.fromEntries(
         Object.entries(weights).map(([k, v]) => [k, Math.max(0.05, Math.min(0.40, v))])
       ) as typeof weights;
@@ -642,14 +644,15 @@ export function createApp() {
         where: { userId: req.user!.id },
         update: {
           weights: normalized,
-          riskAversion,
-          focusPreference
+          riskAversion: risk_aversion,
+          focusPreference: focus_preference
         },
         create: {
           userId: req.user!.id,
+          orgId: req.orgId!,
           weights: normalized,
-          riskAversion,
-          focusPreference
+          riskAversion: risk_aversion,
+          focusPreference: focus_preference
         }
       });
 
@@ -657,7 +660,7 @@ export function createApp() {
         data: {
           userId: req.user!.id,
           eventType: "PERSONALIZATION_UPDATED",
-          metadata: { weights: normalized, riskAversion, focusPreference }
+          metadata: { weights: normalized, riskAversion: risk_aversion, focusPreference: focus_preference }
         }
       });
 
@@ -682,7 +685,7 @@ export function createApp() {
       const input = ActionFeedbackRequestSchema.parse(req.body);
 
       const snapshot = await prisma.snapshot.findFirst({
-        where: { id: input.snapshotId, userId: req.user!.id }
+        where: { id: input.snapshot_id, userId: req.user!.id }
       });
 
       if (!snapshot) {
@@ -696,13 +699,14 @@ export function createApp() {
       const feedback = await prisma.actionFeedback.create({
         data: {
           userId: req.user!.id,
-          snapshotId: input.snapshotId,
-          actionTitle: input.actionTitle,
-          actionCategory: input.actionCategory,
+          orgId: req.orgId!,
+          snapshotId: input.snapshot_id,
+          actionTitle: input.action_title,
+          actionCategory: input.action_category,
           scheduled: input.scheduled,
           feedback: input.feedback,
-          perceivedEffort: input.perceivedEffort,
-          perceivedImpact: input.perceivedImpact,
+          perceivedEffort: input.perceived_effort,
+          perceivedImpact: input.perceived_impact,
           comment: input.comment
         }
       });
@@ -712,8 +716,8 @@ export function createApp() {
           userId: req.user!.id,
           eventType: "ACTION_FEEDBACK_SUBMITTED",
           metadata: {
-            snapshotId: input.snapshotId,
-            actionTitle: input.actionTitle,
+            snapshotId: input.snapshot_id,
+            actionTitle: input.action_title,
             feedback: input.feedback
           }
         }
@@ -778,7 +782,7 @@ export function createApp() {
       const feedbackList = await prisma.actionFeedback.findMany({
         where: { userId: req.user!.id },
         orderBy: { createdAt: "desc" },
-        take: input.lookbackDays ? 100 : 50
+        take: input.apply ? 100 : 50
       });
 
       if (feedbackList.length < 8) {
@@ -1134,12 +1138,14 @@ export function createApp() {
       const pack = await prisma.scenarioPack.create({
         data: {
           userId: req.user!.id,
+          orgId: req.orgId!,
           name: payload.name,
           description: payload.description ?? null,
           baselineSource: payload.baseline_source,
           scenarios: {
             create: payload.scenarios.map((scenario) => ({
               scenarioId: scenario.id,
+              orgId: req.orgId!,
               type: scenario.type,
               params: scenario.params
             }))
@@ -1370,6 +1376,7 @@ export function createApp() {
       await prisma.scenarioRun.create({
         data: {
           userId: req.user!.id,
+          orgId: req.orgId!,
           runType: "simulate",
           baselineRef: baseline.baselineRef,
           resultJson: result
@@ -1509,6 +1516,7 @@ export function createApp() {
       await prisma.scenarioRun.create({
         data: {
           userId: req.user!.id,
+          orgId: req.orgId!,
           scenarioPackId: packId,
           runType: "compare",
           baselineRef: baseline.baselineRef,
@@ -1596,8 +1604,8 @@ export function createApp() {
     async (req, res) => {
       try {
         const provider = "google_calendar";
-        const code = getQueryParam(req.query.code);
-        const state = getQueryParam(req.query.state);
+        const code = getQueryParam(req.query.code as string | string[] | undefined);
+        const state = getQueryParam(req.query.state as string | string[] | undefined);
 
         if (!code || !state) {
           return res.redirect(`${WEB_ORIGIN}/connectors?error=missing_params`);
@@ -1622,12 +1630,14 @@ export function createApp() {
 
         const connector = await prisma.connector.upsert({
           where: { userId_provider: { userId: req.user!.id, provider } },
-          update: {},
+          update: {
+            status: "connected",
+          },
           create: {
             userId: req.user!.id,
+            orgId: req.orgId!,
             provider,
             status: "connected",
-            scopes: []
           }
         });
 
@@ -1723,9 +1733,9 @@ export function createApp() {
         },
         create: {
           userId: req.user!.id,
+          orgId: req.orgId!,
           provider,
           status: "disconnected",
-          scopes: []
         }
       });
 
@@ -1777,9 +1787,9 @@ export function createApp() {
         update: {},
         create: {
           userId: req.user!.id,
+          orgId: req.orgId!,
           provider,
           status: "disconnected",
-          scopes: []
         }
       });
 
@@ -1832,7 +1842,7 @@ export function createApp() {
           status: "active"
         },
         include: {
-          organization: {
+          org: {
             include: {
               _count: {
                 select: { memberships: true }
@@ -1841,17 +1851,17 @@ export function createApp() {
           }
         },
         orderBy: {
-          organization: { createdAt: "asc" }
+          org: { createdAt: "asc" }
         }
       });
 
       const orgs = memberships.map((m) => ({
-        id: m.organization.id,
-        name: m.organization.name,
-        org_type: m.organization.type,
+        id: m.org.id,
+        name: m.org.name,
+        org_type: m.org.type,
         my_role: m.role,
-        member_count: m.organization._count.memberships,
-        created_at: m.organization.createdAt.toISOString()
+        member_count: m.org._count.memberships,
+        created_at: m.org.createdAt.toISOString()
       }));
 
       res.json({ ok: true, data: { orgs } });
@@ -2363,7 +2373,7 @@ export function createApp() {
               orgId: req.orgId!,
               ownerUserId: req.user!.id,
               viewerUserId,
-              scope
+              scope: scope as import("@prisma/client").ConsentScope
             }
           }
         });
@@ -2459,18 +2469,18 @@ export function createApp() {
         }
 
         // Fetch latest weekly report
-        const report = await fetchLatestWeeklyReport(prisma, ownerUserId);
+        const report = await fetchLatestWeeklyReport({ prisma, userId: ownerUserId });
         if (!report) {
           return sendError(res, 404, "No weekly report found", req.requestId);
         }
 
         // Redact and return
         const redacted = {
-          week_start: report.weekStart.toISOString().split("T")[0],
-          summary: report.summary,
-          score_trend: report.scoreTrend,
-          top_risks: report.topRisks || [],
-          next_week_focus: report.nextWeekFocus || []
+          week_start: report.week_start,
+          summary: report.content.summary,
+          score_trend: report.content.score_trend,
+          top_risks: report.content.top_risks || [],
+          next_week_focus: report.content.next_week_focus || []
         };
 
         // Log access
@@ -2479,7 +2489,7 @@ export function createApp() {
             orgId: req.orgId!,
             ownerUserId,
             viewerUserId: req.user!.id,
-            action: "VIEW_WEEKLY_REPORT",
+            action: "view_weekly",
             metadata: { week_start: redacted.week_start }
           }
         });
@@ -2531,10 +2541,11 @@ export function createApp() {
         });
 
         const items = snapshots.map((s) => {
+          const output = s.output as any;
           const item: any = {
             date: s.createdAt.toISOString().split("T")[0],
             life_stability_score: s.lifeStabilityScore,
-            breakdown: s.output.breakdown
+            breakdown: output.breakdown
           };
 
           if (canViewFlags) {
@@ -2550,7 +2561,7 @@ export function createApp() {
             orgId: req.orgId!,
             ownerUserId,
             viewerUserId: req.user!.id,
-            action: "VIEW_HISTORY",
+            action: "view_history",
             metadata: { count: items.length }
           }
         });
@@ -2605,10 +2616,11 @@ export function createApp() {
           return sendError(res, 404, "No data found", req.requestId);
         }
 
+        const snapshotOutput = snapshot.output as any;
         const today: any = {
           date: snapshot.createdAt.toISOString().split("T")[0],
           life_stability_score: snapshot.lifeStabilityScore,
-          breakdown: snapshot.output.breakdown
+          breakdown: snapshotOutput.breakdown
         };
 
         if (canViewFlags) {
@@ -2617,8 +2629,8 @@ export function createApp() {
 
         if (canViewPlan) {
           // Redact priorities (remove notes/assumptions)
-          if (snapshot.output.priorities) {
-            today.priorities = snapshot.output.priorities.map((p: any) => ({
+          if (snapshotOutput.priorities) {
+            today.priorities = snapshotOutput.priorities.map((p: any) => ({
               title: p.title,
               category: p.category,
               time_window: p.time_window,
@@ -2628,8 +2640,8 @@ export function createApp() {
             }));
           }
 
-          if (snapshot.output.schedule_plan) {
-            today.schedule_plan = snapshot.output.schedule_plan.map((s: any) => ({
+          if (snapshotOutput.schedule_plan) {
+            today.schedule_plan = snapshotOutput.schedule_plan.map((s: any) => ({
               time_block: s.time_block,
               activity: s.activity,
               category: s.category
@@ -2643,7 +2655,7 @@ export function createApp() {
             orgId: req.orgId!,
             ownerUserId,
             viewerUserId: req.user!.id,
-            action: "VIEW_TODAY",
+            action: "view_today",
             metadata: { date: today.date }
           }
         });
@@ -3091,7 +3103,7 @@ export function createApp() {
 </html>
         `;
 
-        const pdf = await renderWeeklyPdf(html, req.requestId!);
+        const pdf = await renderWeeklyPdf(html);
 
         await prisma.auditLog.create({
           data: {
@@ -4160,7 +4172,7 @@ export function createApp() {
 </html>
         `;
 
-        const pdf = await renderWeeklyPdf(html, req.requestId!);
+        const pdf = await renderWeeklyPdf(html);
 
         await prisma.auditLog.create({
           data: {

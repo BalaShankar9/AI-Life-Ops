@@ -28,11 +28,11 @@ def generate_plan(checkin: dict, flags: dict, profile_context: dict, schedule: d
         personalization = {
             "weights": {"energy": 0.2, "money": 0.2, "obligations": 0.2, "growth": 0.2, "stability": 0.2},
             "risk_aversion": 0.6,
-            \"focus_preference\": \"mixed\",
+            "focus_preference": "mixed",
         }
     
     used_context: Set[str] = set()
-    damage_control = checkin[\"available_time_hours\"] < 2
+    damage_control = checkin["available_time_hours"] < 2
 
     candidates = _build_candidates(checkin, flags, profile_context, used_context)
 
@@ -41,8 +41,8 @@ def generate_plan(checkin: dict, flags: dict, profile_context: dict, schedule: d
             action for action in candidates if action.time_estimate_min <= DAMAGE_CONTROL_MAX_ITEM_MIN
         ]
 
-    breakdown = {\"energy\": checkin[\"energy_level\"], \"money\": 20 - checkin[\"money_pressure\"], 
-                 \"obligations\": 15, \"growth\": 10, \"stability\": 15}  # approximate baseline
+    breakdown = {"energy": checkin["energy_level"], "money": 20 - checkin["money_pressure"],
+                 "obligations": 15, "growth": 10, "stability": 15}  # approximate baseline
     ranked, personalization_effects = _rank_candidates(candidates, flags, profile_context, personalization, breakdown, used_context)
     priorities, focus_capped = _select_priorities(
         ranked, flags, damage_control, profile_context
@@ -57,10 +57,10 @@ def generate_plan(checkin: dict, flags: dict, profile_context: dict, schedule: d
 
     # Apply focus preference to schedule
     schedule_plan = apply_focus_preference(
-        schedule_result[\"schedule_plan\"], 
-        personalization[\"focus_preference\"]
+        schedule_result["schedule_plan"],
+        personalization["focus_preference"]
     )
-    schedule_result[\"schedule_plan\"] = schedule_plan
+    schedule_result["schedule_plan"] = schedule_plan
 
     selected_titles = {item.title for item in priorities}
     next_best_actions = [
@@ -92,7 +92,9 @@ def generate_plan(checkin: dict, flags: dict, profile_context: dict, schedule: d
         "used_context": sorted(used_context),
         "schedule_plan": schedule_result["schedule_plan"],
         "schedule_conflicts": schedule_result["schedule_conflicts"],
-        "free_time_summary": schedule_result["free_time_summary"],        \"personalization_effects\": personalization_effects,    }
+        "free_time_summary": schedule_result["free_time_summary"],
+        "personalization_effects": personalization_effects,
+    }
 
 
 def _build_candidates(
@@ -272,21 +274,21 @@ def _rank_candidates(
     baseline_breakdown: dict,
     used_context: Set[str],
 ) -> Tuple[List[ActionTemplate], List[str]]:
-    \"\"\"Rank actions by risk reduction, then effort and time, with personalization utility.\"\"\"
-    risk_weight = {\"low\": 0, \"medium\": 2, \"high\": 3}
-    priority_bias = profile_context[\"priority_bias\"]
-    used_context.add(\"priority_bias\")
+    """Rank actions by risk reduction, then effort and time, with personalization utility."""
+    risk_weight = {"low": 0, "medium": 2, "high": 3}
+    priority_bias = profile_context["priority_bias"]
+    used_context.add("priority_bias")
     
     personalization_effects = []
-    highest_risk = max([flags.get(key, \"low\") for key in [\"burnout_risk\", \"financial_risk\", \"compliance_risk\", \"overload_risk\"]])
+    highest_risk = max([flags.get(key, "low") for key in ["burnout_risk", "financial_risk", "compliance_risk", "overload_risk"]])
 
     def score(action: ActionTemplate) -> Tuple[int, float, int, int, int, str]:
-        risk_score = sum(risk_weight.get(flags.get(target, \"low\"), 0) for target in action.risk_targets)
+        risk_score = sum(risk_weight.get(flags.get(target, "low"), 0) for target in action.risk_targets)
         bias_score = _bias_score(action, priority_bias)
         priority_score = risk_score + bias_score
         
         # Compute personalization utility for tie-breaking
-        action_dict = {\"category\": action.category, \"effort\": action.effort}
+        action_dict = {"category": action.category, "effort": action.effort}
         utility = compute_utility(action_dict, personalization, baseline_breakdown, highest_risk)
         
         # Lower effort and time is better after risk reduction.
@@ -296,8 +298,9 @@ def _rank_candidates(
     ranked = sorted(candidates, key=score)
     
     # Build personalization effects explanation
-    if personalization[\"risk_aversion\"] > 0.7:
-        personalization_effects.append(\"High risk aversion: safety-focused actions prioritized.\")    elif personalization["risk_aversion"] < 0.4:
+    if personalization["risk_aversion"] > 0.7:
+        personalization_effects.append("High risk aversion: safety-focused actions prioritized.")
+    elif personalization["risk_aversion"] < 0.4:
         personalization_effects.append("Low risk aversion: growth-focused actions prioritized.")
     
     # Identify which weight categories are emphasized

@@ -24,6 +24,11 @@ export function validateGoogleOAuthConfig() {
   if (process.env.NODE_ENV === "test") {
     return;
   }
+  // Skip validation if Google OAuth is not configured (optional in development)
+  if (!process.env.GOOGLE_OAUTH_CLIENT_ID) {
+    console.warn("Google OAuth not configured - calendar connector will be disabled");
+    return;
+  }
   getGoogleOAuthConfig();
 }
 

@@ -254,47 +254,43 @@ def _build_free_time_summary(schedule: Dict[str, Any], profile_context: Dict[str
 
 
 def _extract_personalization(payload: Dict[str, Any]) -> Dict[str, Any]:
-    \"\"\"Extract and validate personalization from payload, returning defaults if missing.\"\"\"
-    personalization = payload.get(\"personalization\", {})
-    
-    default_weights = {\"energy\": 0.2, \"money\": 0.2, \"obligations\": 0.2, \"growth\": 0.2, \"stability\": 0.2}
-    weights = personalization.get(\"weights\", default_weights)
-    
+    """Extract and validate personalization from payload, returning defaults if missing."""
+    personalization = payload.get("personalization", {})
+
+    default_weights = {"energy": 0.2, "money": 0.2, "obligations": 0.2, "growth": 0.2, "stability": 0.2}
+    weights = personalization.get("weights", default_weights)
+
     if not validate_weights(weights):
         weights = normalize_weights(weights)
-    
+
     return {
-        \"weights\": weights,
-        \"risk_aversion\": personalization.get(\"risk_aversion\", 0.6),
-        \"focus_preference\": personalization.get(\"focus_preference\", \"mixed\"),
+        "weights": weights,
+        "risk_aversion": personalization.get("risk_aversion", 0.6),
+        "focus_preference": personalization.get("focus_preference", "mixed"),
     }
 
 
 def _build_used_personalization(personalization: Dict[str, Any]) -> List[str]:
-    \"\"\"Build list of personalization settings used.\"\"\"
+    """Build list of personalization settings used."""
     used = []
-    
-    weights = personalization[\"weights\"]
+
+    weights = personalization["weights"]
     top_weight = max(weights, key=weights.get)
-    used.append(f\"Weights: {top_weight} emphasized ({weights[top_weight]:.2f})\")
-    
-    risk_aversion = personalization[\"risk_aversion\"]
+    used.append(f"Weights: {top_weight} emphasized ({weights[top_weight]:.2f})")
+
+    risk_aversion = personalization["risk_aversion"]
     if risk_aversion < 0.4:
-        used.append(f\"Risk tolerance: high ({risk_aversion:.1f})\")
+        used.append(f"Risk tolerance: high ({risk_aversion:.1f})")
     elif risk_aversion > 0.7:
-        used.append(f\"Risk aversion: high ({risk_aversion:.1f})\")
+        used.append(f"Risk aversion: high ({risk_aversion:.1f})")
     else:
-        used.append(f\"Risk aversion: moderate ({risk_aversion:.1f})\")
-    
-    focus_pref = personalization[\"focus_preference\"]
-    if focus_pref != \"mixed\":
-        used.append(f\"Focus preference: {focus_pref}\")
-    
+        used.append(f"Risk aversion: moderate ({risk_aversion:.1f})")
+
+    focus_pref = personalization["focus_preference"]
+    if focus_pref != "mixed":
+        used.append(f"Focus preference: {focus_pref}")
+
     return used
-
-
-if __name__ == \"__main__\":
-    main()
 
 
 if __name__ == "__main__":
