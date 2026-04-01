@@ -150,13 +150,13 @@ export async function ensurePersonalOrg(
   const existingMembership = await prisma.membership.findFirst({
     where: {
       userId,
-      organization: {
+      org: {
         type: "personal"
       },
       status: "active"
     },
     include: {
-      organization: true
+      org: true
     }
   });
 

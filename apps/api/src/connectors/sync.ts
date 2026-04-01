@@ -1,4 +1,5 @@
 import type { ConnectorProvider, PrismaClient } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import type { Logger } from "pino";
 
 import { getConnectorAdapter } from "./registry";
@@ -14,16 +15,34 @@ export async function runConnectorSync(params: {
   const { prisma, logger, userId, provider, requestId } = params;
   const adapter = getConnectorAdapter(provider);
 
-  const connector = await prisma.connector.upsert({
-    where: { userId_provider: { userId, provider } },
-    update: {},
-    create: {
-      userId,
-      provider,
-      status: "disconnected",
-      scopes: []
-    }
+  // Find existing connector to get orgId; if not found, find user's personal org
+  let connector = await prisma.connector.findUnique({
+    where: { userId_provider: { userId, provider } }
   });
+
+  let orgId: string;
+  if (connector) {
+    orgId = connector.orgId;
+  } else {
+    // Look up personal org membership to get orgId
+    const membership = await prisma.membership.findFirst({
+      where: { userId, status: "active", org: { type: "personal" } }
+    });
+    if (!membership) {
+      throw new Error(`No org found for user ${userId}`);
+    }
+    orgId = membership.orgId;
+    connector = await prisma.connector.upsert({
+      where: { userId_provider: { userId, provider } },
+      update: {},
+      create: {
+        userId,
+        orgId,
+        provider,
+        status: "disconnected",
+      }
+    });
+  }
 
   const startedAt = new Date();
 
@@ -33,11 +52,12 @@ export async function runConnectorSync(params: {
       ? await replaceCanonicalEvents(
           prisma,
           userId,
+          orgId,
           provider,
           result.events,
           result.replaceWindow
         )
-      : await upsertCanonicalEvents(prisma, userId, provider, result.events);
+      : await upsertCanonicalEvents(prisma, userId, orgId, provider, result.events);
 
     const finishedAt = new Date();
     const hasTokens = Boolean(
@@ -46,6 +66,7 @@ export async function runConnectorSync(params: {
     await prisma.connectorRun.create({
       data: {
         connectorId: connector.id,
+        orgId,
         startedAt,
         finishedAt,
         status: "success",
@@ -87,6 +108,7 @@ export async function runConnectorSync(params: {
     await prisma.connectorRun.create({
       data: {
         connectorId: connector.id,
+        orgId,
         startedAt,
         finishedAt,
         status: "error",
@@ -127,6 +149,7 @@ export async function runConnectorSync(params: {
 async function upsertCanonicalEvents(
   prisma: PrismaClient,
   userId: string,
+  orgId: string,
   provider: ConnectorProvider,
   events: CanonicalEventInput[]
 ) {
@@ -148,10 +171,11 @@ async function upsertCanonicalEvents(
         title: event.title ?? null,
         location: event.location ?? null,
         isAllDay: event.isAllDay ?? false,
-        metadata: event.metadata ?? {}
+        metadata: (event.metadata ?? {}) as Prisma.InputJsonValue
       },
       create: {
         userId,
+        orgId,
         sourceProvider: provider,
         sourceId: event.sourceId,
         kind: event.kind,
@@ -161,7 +185,7 @@ async function upsertCanonicalEvents(
         title: event.title ?? null,
         location: event.location ?? null,
         isAllDay: event.isAllDay ?? false,
-        metadata: event.metadata ?? {}
+        metadata: (event.metadata ?? {}) as Prisma.InputJsonValue
       }
     });
     upserted += 1;
@@ -172,6 +196,7 @@ async function upsertCanonicalEvents(
 async function replaceCanonicalEvents(
   prisma: PrismaClient,
   userId: string,
+  orgId: string,
   provider: ConnectorProvider,
   events: CanonicalEventInput[],
   window: { start: Date; end: Date }
@@ -195,6 +220,7 @@ async function replaceCanonicalEvents(
   const createResult = await prisma.event.createMany({
     data: events.map((event) => ({
       userId,
+      orgId,
       sourceProvider: provider,
       sourceId: event.sourceId,
       kind: event.kind,
@@ -204,7 +230,7 @@ async function replaceCanonicalEvents(
       title: event.title ?? null,
       location: event.location ?? null,
       isAllDay: event.isAllDay ?? false,
-      metadata: event.metadata ?? {}
+      metadata: (event.metadata ?? {}) as Prisma.InputJsonValue
     }))
   });
 

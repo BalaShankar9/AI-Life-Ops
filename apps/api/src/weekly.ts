@@ -83,6 +83,14 @@ export async function generateWeeklyReport(params: {
     throw new Error("Complete onboarding before generating a weekly review");
   }
 
+  const membership = await prisma.membership.findFirst({
+    where: { userId, status: "active", org: { type: "personal" } }
+  });
+  if (!membership) {
+    throw new Error(`No org found for user ${userId}`);
+  }
+  const orgId = membership.orgId;
+
   const snapshots = await prisma.snapshot.findMany({
     where: {
       userId,
@@ -130,6 +138,7 @@ export async function generateWeeklyReport(params: {
       },
       create: {
         userId,
+        orgId,
         weekStart: range.startDate,
         weekEnd: range.endDate,
         content: parsed.data
@@ -276,9 +285,7 @@ export function buildWeeklyPdfHtml(report: WeeklyReportOutput) {
 
 export async function renderWeeklyPdf(html: string) {
   const puppeteerModule = await import("puppeteer");
-  const puppeteer =
-    (puppeteerModule as { default?: typeof import("puppeteer") }).default ??
-    puppeteerModule;
+  const puppeteer = (puppeteerModule.default ?? puppeteerModule) as unknown as typeof import("puppeteer");
   const browser = await puppeteer.launch({
     headless: true,
     args: ["--no-sandbox", "--disable-setuid-sandbox"]

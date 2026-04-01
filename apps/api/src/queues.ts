@@ -28,7 +28,7 @@ export function getConnectorSyncQueue(): QueueLike {
   if (process.env.NODE_ENV === "test") {
     return {
       add: async () => ({ id: "test-job" })
-    } as QueueLike;
+    } as unknown as QueueLike;
   }
 
   connectorQueue = new Queue(CONNECTOR_SYNC_QUEUE, {

@@ -691,7 +691,7 @@ export function createApp() {
       if (!snapshot) {
         const errorResponse: ApiErrorResponse = {
           ok: false,
-          error: "Snapshot not found or not authorized"
+          error: { message: "Snapshot not found or not authorized" }
         };
         return res.status(404).json(errorResponse);
       }
@@ -1234,6 +1234,7 @@ export function createApp() {
         await tx.scenario.createMany({
           data: payload.scenarios.map((scenario) => ({
             scenarioPackId: existing.id,
+            orgId: req.orgId!,
             scenarioId: scenario.id,
             type: scenario.type,
             params: scenario.params
@@ -3155,9 +3156,9 @@ export function createApp() {
           where: {
             userId: req.user!.id,
             status: "active",
-            organization: { type: "personal" }
+            org: { type: "personal" }
           },
-          include: { organization: true }
+          include: { org: true }
         });
         if (!personalMembership) {
           return sendError(res, 404, "No personal organization found", req.requestId);
@@ -3234,7 +3235,7 @@ export function createApp() {
         }),
         prisma.event.findMany({
           where: { userId: req.user!.id, orgId: targetOrgId },
-          orderBy: { startsAt: "desc" },
+          orderBy: { startTs: "desc" },
           take: 2000
         })
       ]);
@@ -3427,9 +3428,9 @@ export function createApp() {
           where: {
             userId: req.user!.id,
             status: "active",
-            organization: { type: "personal" }
+            org: { type: "personal" }
           },
-          include: { organization: true }
+          include: { org: true }
         });
 
         if (!personalOrg) {
@@ -3495,11 +3496,11 @@ export function createApp() {
           prisma.actionFeedback.deleteMany({ where: { userId: req.user!.id, orgId: request.orgId } }),
           prisma.personalizationProfile.deleteMany({ where: { userId: req.user!.id, orgId: request.orgId } }),
           prisma.scenarioRun.deleteMany({ where: { userId: req.user!.id, orgId: request.orgId } }),
-          prisma.scenario.deleteMany({ where: { userId: req.user!.id, orgId: request.orgId } }),
+          prisma.scenario.deleteMany({ where: { orgId: request.orgId } }),
           prisma.scenarioPack.deleteMany({ where: { userId: req.user!.id, orgId: request.orgId } }),
           prisma.weeklyReport.deleteMany({ where: { userId: req.user!.id, orgId: request.orgId } }),
           prisma.event.deleteMany({ where: { userId: req.user!.id, orgId: request.orgId } }),
-          prisma.connectorRun.deleteMany({ where: { userId: req.user!.id, orgId: request.orgId } }),
+          prisma.connectorRun.deleteMany({ where: { orgId: request.orgId } }),
           prisma.connector.deleteMany({ where: { userId: req.user!.id, orgId: request.orgId } }),
           prisma.snapshot.deleteMany({ where: { userId: req.user!.id, orgId: request.orgId } }),
           prisma.checkin.deleteMany({ where: { userId: req.user!.id, orgId: request.orgId } })
@@ -3752,7 +3753,7 @@ export function createApp() {
   
   app.post(
     "/api/org/access-reviews/create",
-    requireOrgAccess,
+    requireOrgAccess(prisma),
     requireRole("admin"),
     async (req, res, next) => {
       try {
@@ -3778,7 +3779,7 @@ export function createApp() {
         const accessLogs = await prisma.sharedAccessLog.findMany({
           where: {
             orgId: req.orgId!,
-            accessedAt: { gte: periodStart, lte: periodEnd }
+            createdAt: { gte: periodStart, lte: periodEnd }
           },
           include: { owner: true, viewer: true }
         });
@@ -3795,7 +3796,7 @@ export function createApp() {
             owner_email: log.owner.email,
             viewer_email: log.viewer.email,
             action: log.action,
-            accessed_at: log.accessedAt.toISOString()
+            accessed_at: log.createdAt.toISOString()
           })),
           period_start: periodStart.toISOString(),
           period_end: periodEnd.toISOString()
@@ -3821,7 +3822,6 @@ export function createApp() {
         await prisma.auditLog.create({
           data: {
             userId: req.user!.id,
-            orgId: req.orgId!,
             eventType: "ACCESS_REVIEW_CREATED",
             metadata: {
               review_id: record.id,
@@ -3854,7 +3854,7 @@ export function createApp() {
 
   app.post(
     "/api/org/access-reviews/:id/complete",
-    requireOrgAccess,
+    requireOrgAccess(prisma),
     requireRole("admin"),
     async (req, res, next) => {
       try {
@@ -3910,7 +3910,6 @@ export function createApp() {
         await prisma.auditLog.create({
           data: {
             userId: req.user!.id,
-            orgId: req.orgId!,
             eventType: "ACCESS_REVIEW_COMPLETED",
             metadata: { review_id: id }
           }
@@ -3939,7 +3938,7 @@ export function createApp() {
 
   app.get(
     "/api/org/access-reviews",
-    requireOrgAccess,
+    requireOrgAccess(prisma),
     requireRole("admin"),
     async (req, res, next) => {
       try {
@@ -3973,7 +3972,7 @@ export function createApp() {
 
   app.get(
     "/api/org/access-reviews/:id/evidence.pdf",
-    requireOrgAccess,
+    requireOrgAccess(prisma),
     requireRole("admin"),
     async (req, res, next) => {
       try {
@@ -3998,10 +3997,10 @@ export function createApp() {
         const accessLogs = await prisma.sharedAccessLog.findMany({
           where: {
             orgId: req.orgId!,
-            accessedAt: { gte: review.periodStart, lte: review.periodEnd }
+            createdAt: { gte: review.periodStart, lte: review.periodEnd }
           },
           include: { owner: true, viewer: true },
-          orderBy: { accessedAt: "desc" }
+          orderBy: { createdAt: "desc" }
         });
 
         // Generate PDF
@@ -4155,7 +4154,7 @@ export function createApp() {
           <td>${log.owner.email}</td>
           <td>${log.viewer.email}</td>
           <td>${log.action}</td>
-          <td>${log.accessedAt.toISOString()}</td>
+          <td>${log.createdAt.toISOString()}</td>
         </tr>
       `
         )
@@ -4177,7 +4176,6 @@ export function createApp() {
         await prisma.auditLog.create({
           data: {
             userId: req.user!.id,
-            orgId: req.orgId!,
             eventType: "ACCESS_REVIEW_EVIDENCE_EXPORTED",
             metadata: { review_id: id }
           }
@@ -4199,7 +4197,7 @@ export function createApp() {
   
   app.get(
     "/api/org/monitoring",
-    requireOrgAccess,
+    requireOrgAccess(prisma),
     requireRole("admin"),
     async (req, res, next) => {
       try {
