@@ -1,6 +1,12 @@
+![AI Life Ops — Connect daily check-ins with a weekly plan.](.github/showcase/banner.svg)
+
+**[Project guide](docs/SHOWCASE.md)** · [Source](https://github.com/BalaShankar9/AI-Life-Ops) · [Issues](https://github.com/BalaShankar9/AI-Life-Ops/issues) · [Bala's work](https://github.com/BalaShankar9)
+
+> **Current stage:** Application foundation · known issues documented. [See the evidence and next release checklist](docs/SHOWCASE.md).
+
 # AI Life Ops
 
-Investor-grade monorepo scaffold with SOC2 controls, GDPR compliance, and production-ready CI/CD.
+A life-operations application foundation with daily planning, weekly reviews and a Python decision engine. Security and privacy design documents are included; they do not constitute an independent compliance certification.
 
 ## Quick Start
 
@@ -15,7 +21,7 @@ npm run db:up
 cp apps/api/.env.example apps/api/.env
 cp apps/web/.env.example apps/web/.env.local
 
-# 4. Update secrets in apps/api/.env (see SECURITY.md for key generation)
+# 4. Update secrets in apps/api/.env (see docs/SECURITY.md for key generation)
 
 # 5. Run migrations + seed
 npm run prisma:migrate -w apps/api
@@ -112,7 +118,7 @@ API: http://localhost:4000/health
 - Run `npm run verify:secrets` before every commit to scan for leaked secrets.
 - See [docs/SECURITY.md](docs/SECURITY.md) for secret management, key rotation, and security policies.
 - SOC2 controls documented in [docs/soc2-pack/](docs/soc2-pack/)
-- GDPR compliance with data export and deletion APIs
+- Data export and deletion APIs intended to support privacy workflows; deployment behaviour requires validation.
 
 ## CI/CD
 
